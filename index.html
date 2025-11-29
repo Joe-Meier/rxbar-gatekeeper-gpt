@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>No B.S. GPT Gatekeeper</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-neutral-100 text-neutral-900">
+  <div class="min-h-screen flex items-center justify-center px-4 py-8">
+    <div class="w-full max-w-xl bg-white rounded-2xl shadow-md border border-neutral-200 flex flex-col overflow-hidden">
+      <!-- Header -->
+      <div class="px-4 py-3 border-b border-neutral-200 flex items-center justify-between bg-neutral-50">
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 bg-black text-white text-[11px] tracking-[0.18em] uppercase rounded-sm">
+            No B.S.
+          </span>
+          <div>
+            <h1 class="text-sm font-semibold leading-tight">Gatekeeper</h1>
+            <p class="text-[11px] text-neutral-500">Holiday Contact Screening</p>
+          </div>
+        </div>
+        <div class="text-right text-[11px] text-neutral-500">
+          <div>Messages: <span id="msgCount" class="font-mono text-neutral-800">0</span></div>
+          <div class="text-[10px]">15+ unlocks a “reward”</div>
+        </div>
+      </div>
+
+      <!-- Chat area -->
+      <div id="chat" class="flex-1 overflow-y-auto px-4 py-3 space-y-3 text-sm bg-white">
+        <!-- Messages will go here -->
+      </div>
+
+      <!-- Input area -->
+      <form id="chatForm" class="border-t border-neutral-200 bg-neutral-50 px-3 py-2 flex items-center gap-2">
+        <input
+          id="userInput"
+          class="flex-1 text-sm px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-800 focus:border-neutral-800 bg-white"
+          placeholder="Explain why you *need* to contact them..."
+          autocomplete="off"
+        />
+        <button
+          type="submit"
+          id="sendBtn"
+          class="text-sm px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const formEl = document.getElementById('chatForm');
+    const inputEl = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const msgCountEl = document.getElementById('msgCount');
+
+    // Full chat history we send to the backend each time
+    let history = [];
+    let messageCount = 0;
+
+    function addMessage(role, text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+
+      const bubble = document.createElement('div');
+      bubble.className =
+        'max-w-[80%] px-3 py-2 rounded-lg text-sm whitespace-pre-wrap ' +
+        (role === 'user'
+          ? 'bg-neutral-900 text-white rounded-br-sm'
+          : 'bg-neutral-100 text-neutral-900 border border-neutral-200 rounded-bl-sm');
+
+      bubble.textContent = text;
+      wrapper.appendChild(bubble);
+      chatEl.appendChild(wrapper);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function setLoading(isLoading) {
+      sendBtn.disabled = isLoading;
+      sendBtn.textContent = isLoading ? 'Thinking…' : 'Send';
+    }
+
+    // Initial assistant message
+    function init() {
+      const intro = "Hi. I’m the No B.S. Gatekeeper.\n\n" +
+        "My job is to protect this person's time while they’re on PTO. " +
+        "I’ll help you think through your problem, suggest alternatives, " +
+        "and ask annoying follow-up questions.\n\n" +
+        "One important detail: I will never actually let you contact them.";
+      addMessage('assistant', intro);
+      history.push({ role: 'assistant', content: intro });
+    }
+
+    init();
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      messageCount += 1;
+      msgCountEl.textContent = messageCount.toString();
+
+      // Show user message
+      addMessage('user', text);
+      history.push({ role: 'user', content: text });
+      inputEl.value = '';
+      setLoading(true);
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            history,
+            messageCount
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error('Request failed');
+        }
+
+        const data = await res.json();
+        const reply = data.reply || 'Something went wrong. Try again in a bit.';
+
+        addMessage('assistant', reply);
+        history.push({ role: 'assistant', content: reply });
+      } catch (err) {
+        console.error(err);
+        const msg = 'Hmm, something broke on my end. Try one more time.\n\n(But still, you cannot contact them.)';
+        addMessage('assistant', msg);
+        history.push({ role: 'assistant', content: msg });
+      } finally {
+        setLoading(false);
+        inputEl.focus();
+      }
+    });
+  </script>
+</body>
+</html>
