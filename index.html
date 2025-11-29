@@ -97,20 +97,25 @@
       background: #333;
     }
 
-    /* Generated Link Styles */
-    .link-output {
+    /* Output Section Styles */
+    .output-section {
       display: none;
       margin-top: 32px;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .output-section.visible {
+      display: flex;
+    }
+
+    .output-box {
       padding: 20px;
       background: #f5f5f5;
       border: 2px solid #000;
     }
 
-    .link-output.visible {
-      display: block;
-    }
-
-    .link-output p {
+    .output-box h2 {
       font-size: 0.8rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -118,7 +123,7 @@
       margin-bottom: 12px;
     }
 
-    .link-output input {
+    .output-box input {
       width: 100%;
       padding: 12px;
       font-size: 0.85rem;
@@ -128,8 +133,22 @@
       margin-bottom: 12px;
     }
 
-    .link-output button {
+    .output-box textarea {
       width: 100%;
+      padding: 12px;
+      font-size: 0.85rem;
+      border: 1px solid #ccc;
+      background: #fff;
+      font-family: inherit;
+      line-height: 1.6;
+      resize: vertical;
+      min-height: 200px;
+      margin-bottom: 12px;
+    }
+
+    .output-box button {
+      width: 100%;
+      margin-top: 0;
     }
 
     .copied-msg {
@@ -234,6 +253,40 @@
     .typing-indicator.visible {
       display: block;
     }
+
+    /* Reward styles */
+    .reward-container {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .reward-container.visible {
+      display: block;
+    }
+
+    .reward-container h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .reward-container p {
+      font-size: 0.95rem;
+      color: #333;
+      margin-bottom: 24px;
+    }
+
+    .reward-container .coupon {
+      display: inline-block;
+      padding: 20px 32px;
+      background: #000;
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -242,25 +295,34 @@
 
     <!-- Setup Form -->
     <div class="setup-form" id="setupForm">
-      <p>Create your personal gatekeeper link to protect your PTO. Add it to your out-of-office email and let the gatekeeper handle the rest.</p>
+      <p>Create your personal gatekeeper to protect your PTO. Generate your link, copy the OOO email, and let the gatekeeper handle the rest.</p>
       
       <div class="form-group">
         <label for="nameInput">Your Name</label>
-        <input type="text" id="nameInput" placeholder="e.g. Kevin">
+        <input type="text" id="nameInput" placeholder="e.g. Jo">
       </div>
 
       <div class="form-group">
         <label for="roleInput">Your Occupation</label>
-        <input type="text" id="roleInput" placeholder="e.g. Creative Director">
+        <input type="text" id="roleInput" placeholder="e.g. Creative Developer">
       </div>
 
-      <button type="button" id="generateBtn">Generate My Link</button>
+      <button type="button" id="generateBtn">Generate My Gatekeeper</button>
 
-      <div class="link-output" id="linkOutput">
-        <p>Your Gatekeeper Link</p>
-        <input type="text" id="generatedLink" readonly>
-        <button type="button" id="copyBtn">Copy Link</button>
-        <div class="copied-msg" id="copiedMsg">Copied to clipboard!</div>
+      <div class="output-section" id="outputSection">
+        <div class="output-box">
+          <h2>Your Gatekeeper Link</h2>
+          <input type="text" id="generatedLink" readonly>
+          <button type="button" id="copyLinkBtn">Copy Link</button>
+          <div class="copied-msg" id="linkCopiedMsg">Copied!</div>
+        </div>
+
+        <div class="output-box">
+          <h2>Your OOO Email</h2>
+          <textarea id="oooEmail" readonly></textarea>
+          <button type="button" id="copyEmailBtn">Copy Email</button>
+          <div class="copied-msg" id="emailCopiedMsg">Copied!</div>
+        </div>
       </div>
     </div>
 
@@ -270,10 +332,17 @@
         <!-- Messages will be added here -->
       </div>
       <div class="typing-indicator" id="typingIndicator">Gatekeeper is typing...</div>
-      <div class="chat-input-container">
+      <div class="chat-input-container" id="chatInputContainer">
         <input type="text" id="chatInput" placeholder="Explain why you need to contact them…">
         <button type="button" id="sendBtn">Send</button>
       </div>
+    </div>
+
+    <!-- Reward -->
+    <div class="reward-container" id="rewardContainer">
+      <h2>Okay, you win.</h2>
+      <p>You've earned a free RXBAR for your persistence.</p>
+      <div class="coupon">[COUPON PLACEHOLDER]</div>
     </div>
   </div>
 
@@ -288,18 +357,24 @@
     const chatContainer = document.getElementById('chatContainer');
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
+    const chatInputContainer = document.getElementById('chatInputContainer');
     const sendBtn = document.getElementById('sendBtn');
     const typingIndicator = document.getElementById('typingIndicator');
     const generateBtn = document.getElementById('generateBtn');
-    const linkOutput = document.getElementById('linkOutput');
+    const outputSection = document.getElementById('outputSection');
     const generatedLink = document.getElementById('generatedLink');
-    const copyBtn = document.getElementById('copyBtn');
-    const copiedMsg = document.getElementById('copiedMsg');
+    const oooEmail = document.getElementById('oooEmail');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    const copyEmailBtn = document.getElementById('copyEmailBtn');
+    const linkCopiedMsg = document.getElementById('linkCopiedMsg');
+    const emailCopiedMsg = document.getElementById('emailCopiedMsg');
     const nameInput = document.getElementById('nameInput');
     const roleInput = document.getElementById('roleInput');
+    const rewardContainer = document.getElementById('rewardContainer');
 
     // Conversation history for API
     let conversationHistory = [];
+    let messageCount = 0;
 
     // Check if we're in chat mode or setup mode
     if (personName && personRole) {
@@ -311,7 +386,7 @@
       addMessage('gatekeeper', `Why do you need to contact ${personName}?`);
     }
 
-    // Setup form: Generate link
+    // Setup form: Generate link and OOO email
     generateBtn.addEventListener('click', () => {
       const name = nameInput.value.trim();
       const role = roleInput.value.trim();
@@ -326,15 +401,38 @@
       const fullLink = `${baseUrl}?${params.toString()}`;
 
       generatedLink.value = fullLink;
-      linkOutput.classList.add('visible');
+
+      // Generate OOO email
+      const emailTemplate = `Hi there,
+
+Thanks for reaching out. I'm currently out of office and won't be checking email.
+
+If this is urgent (and I mean truly urgent), you can try your luck with my gatekeeper:
+${fullLink}
+
+Fair warning: they're not easy to get past.
+
+Talk soon,
+${name}`;
+
+      oooEmail.value = emailTemplate;
+      outputSection.classList.add('visible');
     });
 
     // Copy link
-    copyBtn.addEventListener('click', () => {
+    copyLinkBtn.addEventListener('click', () => {
       generatedLink.select();
       navigator.clipboard.writeText(generatedLink.value);
-      copiedMsg.classList.add('visible');
-      setTimeout(() => copiedMsg.classList.remove('visible'), 2000);
+      linkCopiedMsg.classList.add('visible');
+      setTimeout(() => linkCopiedMsg.classList.remove('visible'), 2000);
+    });
+
+    // Copy email
+    copyEmailBtn.addEventListener('click', () => {
+      oooEmail.select();
+      navigator.clipboard.writeText(oooEmail.value);
+      emailCopiedMsg.classList.add('visible');
+      setTimeout(() => emailCopiedMsg.classList.remove('visible'), 2000);
     });
 
     // Chat: Add message to UI
@@ -351,6 +449,12 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // Show reward
+    function showReward() {
+      chatInputContainer.style.display = 'none';
+      rewardContainer.classList.add('visible');
+    }
+
     // Chat: Send message
     async function sendMessage() {
       const userText = chatInput.value.trim();
@@ -359,6 +463,13 @@
       // Add user message to UI
       addMessage('user', userText);
       chatInput.value = '';
+      messageCount++;
+
+      // Check if we've hit 15 messages
+      if (messageCount >= 15) {
+        showReward();
+        return;
+      }
 
       // Add to history
       conversationHistory.push({ role: 'user', content: userText });
